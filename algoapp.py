@@ -15,7 +15,6 @@ if "analysis_done" not in st.session_state: st.session_state.analysis_done = Fal
 if "yt_data" not in st.session_state: st.session_state.yt_data = None
 if "ig_data" not in st.session_state: st.session_state.ig_data = None
 if "ai_response" not in st.session_state: st.session_state.ai_response = ""
-if "chat_history" not in st.session_state: st.session_state.chat_history = []
 if "current_key_index" not in st.session_state: st.session_state.current_key_index = 0
 
 # 3. API Keys Loading
@@ -27,7 +26,7 @@ except Exception as e:
     st.error("⚠️ Secrets missing! API Keys check karo.")
     st.stop()
 
-# 4. 🌌 PURE DARK CINEMATIC CSS
+# 4. 🌌 PURE DARK CINEMATIC & NEON CSS
 dark_theme_css = """
 <style>
 #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
@@ -42,10 +41,21 @@ dark_theme_css = """
 .blueprint-card { background: rgba(10, 25, 47, 0.7); backdrop-filter: blur(10px); border-left: 4px solid #00ffcc; border: 1px solid rgba(255,255,255,0.05); padding: 25px; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 .blueprint-card h3 { margin-top: 0; font-family: 'Arial', sans-serif; letter-spacing: 0.5px; }
 .blueprint-card p, .blueprint-card li { font-size: 1.05rem; line-height: 1.6; color: #ccd6f6; }
-.stChatInputContainer { border: 1px solid #00ffcc !important; border-radius: 10px !important; background-color: rgba(10, 25, 47, 0.8) !important; }
-textarea { color: #00ffcc !important; -webkit-text-fill-color: #00ffcc !important; }
-.stChatMessage { background-color: rgba(10, 25, 47, 0.5) !important; border: 1px solid rgba(0, 255, 204, 0.2); border-radius: 10px; color: white !important; }
 [data-testid="stFileUploadDropzone"] { background-color: rgba(10, 25, 47, 0.6) !important; border: 2px dashed #00ffcc !important; }
+
+/* 🔥 NEW: THE FINAL VERDICT NEON BOX */
+.final-verdict-card { 
+    background: linear-gradient(145deg, rgba(0, 255, 170, 0.1) 0%, rgba(5, 11, 20, 0.9) 100%); 
+    border: 2px solid #00ffaa; 
+    padding: 30px; 
+    border-radius: 12px; 
+    margin-top: 40px; 
+    margin-bottom: 25px;
+    box-shadow: 0 0 25px rgba(0, 255, 170, 0.3); 
+}
+.final-verdict-card h3 { margin-top: 0; color: #00ffaa; font-family: 'Arial', sans-serif; font-size: 1.5rem; text-transform: uppercase;}
+.final-verdict-card p, .final-verdict-card li { font-size: 1.15rem; line-height: 1.7; color: #ffffff; }
+.final-verdict-card strong { color: #ffd700; }
 </style>
 """
 st.markdown(dark_theme_css, unsafe_allow_html=True)
@@ -56,7 +66,7 @@ st.markdown(dark_theme_css, unsafe_allow_html=True)
 def get_youtube_data(channel_url, api_key):
     if not api_key: return None, "YouTube API Key missing."
     handle_match = re.search(r'@([a-zA-Z0-9_-]+)', channel_url)
-    if not handle_match: return None, "Bhai URL me '@' wala handle nahi mila."
+    if not handle_match: return None, "URL me '@' wala handle nahi mila."
     handle = handle_match.group(1)
     try:
         url1 = f"https://www.googleapis.com/youtube/v3/channels?part=contentDetails,statistics&forHandle={handle}&key={api_key}"
@@ -76,7 +86,7 @@ def get_youtube_data(channel_url, api_key):
             video_data_list.append(f"Title: '{title}' | Views: {views}")
         return {"handle": handle, "subs": subs, "videos": video_data_list}, None
     except Exception:
-        return None, "YouTube data fetch karne me error aaya."
+        return None, "YouTube data fetch me error aaya."
 
 def get_instagram_data(username, api_key):
     username = username.replace("@", "").strip()
@@ -93,13 +103,14 @@ def get_instagram_data(username, api_key):
     except Exception: return {"username": username, "status": "API Timeout"}, None
 
 # ==========================================
-# FRONT PAGE UI: ZONE 1 (CHANNEL ANALYZER)
+# FRONT PAGE UI
 # ==========================================
 st.markdown("<h1 class='glow-title'>AI CREATOR STUDIO</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-title'>Decode your algorithm. Predict your virality.</p>", unsafe_allow_html=True)
 
-tab1, tab2 = st.tabs(["📈 Channel Analyzer", "🎬 Viral Predictor (Video Upload)"])
+tab1, tab2 = st.tabs(["📈 Channel Analyzer", "🎬 Viral Predictor (Pre-Upload Check)"])
 
+# ----------------- TAB 1: CHANNEL ANALYZER -----------------
 with tab1:
     col1, col2 = st.columns(2)
     with col1: yt_link = st.text_input("🔗 YouTube Channel URL", placeholder="https://youtube.com/@yourchannel")
@@ -111,19 +122,17 @@ with tab1:
         if not yt_link and not ig_username: st.warning("⚠️ Koi ek link toh daal!")
         else:
             status_placeholder = st.empty()
-            status_placeholder.markdown("<div class='matrix-text'>⚡ Initializing Data Scraping...</div>", unsafe_allow_html=True)
+            status_placeholder.markdown("<div class='matrix-text'>⚡ Fetching data...</div>", unsafe_allow_html=True)
             
             yt_data, ig_data = None, None
             if yt_link: yt_data, _ = get_youtube_data(yt_link, yt_api_key)
             if ig_username: ig_data, _ = get_instagram_data(ig_username, rapid_api_key)
             
-            status_placeholder.markdown("<div class='matrix-text'>⚡ Fusing data for AI analysis...</div>", unsafe_allow_html=True)
-            
             user_prompt = "Target Digital Identity:\n"
             if yt_data: user_prompt += f"YouTube: @{yt_data['handle']}.\nLatest Videos:\n{chr(10).join(yt_data['videos'])}\n"
             if ig_data: user_prompt += f"Instagram Info: {ig_data}.\n"
             
-            system_instruction = "Output EXACTLY in 4 HTML cards: <div class='blueprint-card'><h3>...</h3><p>...</p></div> for Brutal Truth, Niche, Timing, Next 3 Videos."
+            system_instruction = "Output EXACTLY in 4 HTML cards: <div class='blueprint-card'><h3>...</h3><p>...</p></div> for Brutal Truth, Niche, Timing, Next 3 Videos. No markdown wrapping."
             
             chat_success = False
             for _ in range(len(api_keys)):
@@ -139,17 +148,14 @@ with tab1:
             status_placeholder.empty()
             if chat_success:
                 st.session_state.yt_data = yt_data
-                st.session_state.ig_data = ig_data
                 st.session_state.analysis_done = True
                 st.success("✅ Analysis Complete!")
                 st.markdown(st.session_state.ai_response, unsafe_allow_html=True)
 
-# ==========================================
-# FRONT PAGE UI: ZONE 2 (VIRAL PREDICTOR)
-# ==========================================
+# ----------------- TAB 2: VIRAL PREDICTOR -----------------
 with tab2:
     st.markdown("<h2 class='section-title'>🔮 The Pre-Upload Viral Check</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#8892b0;'>Public karne se pehle video yahan daal. AI bata dega chalegi ya pit jayegi.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#8892b0;'>Public karne se pehle video yahan daal. AI bata dega chalegi ya pit jayegi aur theek kaise karna hai.</p>", unsafe_allow_html=True)
     
     uploaded_video = st.file_uploader("📂 Upload Video (MP4/MOV - Keep it under 200MB)", type=["mp4", "mov"])
     predict_button = st.button("👁️ Predict Viral Score & Rank", use_container_width=True)
@@ -159,43 +165,50 @@ with tab2:
         status_vid.markdown("<div class='matrix-text'>⚡ Uploading video to AI Brain...</div>", unsafe_allow_html=True)
         
         try:
-            # Save uploaded video temporarily
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
                 tmp_file.write(uploaded_video.read())
                 tmp_path = tmp_file.name
             
             client = genai.Client(api_key=api_keys[st.session_state.current_key_index].strip())
             
-            # Uploading to Gemini servers
             status_vid.markdown("<div class='matrix-text'>⚡ AI is watching every frame & listening to audio...</div>", unsafe_allow_html=True)
             video_file = client.files.upload(file=tmp_path)
-            
-            # Wait for processing if needed (Gemini sometimes needs a few secs for videos)
             time.sleep(3) 
             
-            # Create Context from Channel Data if it exists
             context = "New User Video."
             if st.session_state.yt_data:
-                context = f"This video belongs to YouTube Channel @{st.session_state.yt_data['handle']}. Their past video patterns are: {st.session_state.yt_data['videos']}. Does this new video match their aesthetic and audience?"
+                context = f"This video belongs to YouTube Channel @{st.session_state.yt_data['handle']}. Their past video patterns: {st.session_state.yt_data['videos']}. Evaluate based on their specific audience."
             
-            video_prompt = f"{context}\nWatch this unreleased video and give me a brutal review before posting. Give output EXACTLY in 4 HTML cards using class='blueprint-card':\n1. <h3 style='color:#ffd700'>🔥 Viral Probability Score (0-100%)</h3><p>[Verdict]</p>\n2. <h3 style='color:#ff4d4d'>🪝 The Hook Check</h3><p>[Rate the first 3 seconds out of 10. Is it engaging?]</p>\n3. <h3 style='color:#00ffcc'>📖 Storyline & Retention</h3><p>[Will they watch till the end? Why or why not?]</p>\n4. <h3 style='color:#ff00ff'>✂️ Editing & Aesthetic</h3><p>[Critique the cuts, audio, text, and raw vibe. What to fix?]</p>\nNo markdown blocks."
+            # 🔥 THE NEW PROMPT WITH THE FINAL FREE ADVICE SECTION
+            video_prompt = f"{context}\nWatch this unreleased video and give a brutal, honest review. " \
+                           "You MUST NOT output markdown wrappers like ```html. Just raw HTML text. " \
+                           "Give output EXACTLY using this HTML structure:\n" \
+                           "<div class='blueprint-card'><h3 style='color:#ffd700'>🔥 1. Viral Probability Score (0-100%)</h3><p>[Verdict]</p></div>\n" \
+                           "<div class='blueprint-card'><h3 style='color:#ff4d4d'>🪝 2. The Hook Check</h3><p>[Rate first 3 secs. Is it engaging?]</p></div>\n" \
+                           "<div class='blueprint-card'><h3 style='color:#00ffcc'>📖 3. Storyline & Retention</h3><p>[Will they watch till the end?]</p></div>\n" \
+                           "<div class='blueprint-card'><h3 style='color:#ff00ff'>✂️ 4. Editing & Aesthetic</h3><p>[Critique the cuts, audio, vibe]</p></div>\n" \
+                           "<div class='final-verdict-card'><h3>💡 5. The Final Verdict & Free Advice</h3>" \
+                           "<p><strong>Will it go viral?</strong> [Yes / No / Needs Work - Explain simply in 1 line]</p>" \
+                           "<p><strong>Expected Views:</strong> [Give a realistic estimated number/range]</p>" \
+                           "<p><strong>Actionable Next Steps:</strong><ul><li>[Action 1 to improve before posting]</li><li>[Action 2]</li><li>[Action 3]</li></ul></p></div>"
             
-            status_vid.markdown("<div class='matrix-text'>⚡ Calculating Viral Probability...</div>", unsafe_allow_html=True)
+            status_vid.markdown("<div class='matrix-text'>⚡ Calculating Viral Probability & Expected Views...</div>", unsafe_allow_html=True)
             
             response = client.models.generate_content(
                 model='gemini-2.5-flash', 
-                contents=[video_file, video_prompt]
+                contents=[video_file, video_prompt],
+                config=types.GenerateContentConfig(temperature=0.7)
             )
             
-            # Cleanup temp file
             os.remove(tmp_path)
             
             status_vid.empty()
             st.success("✅ Video Analysis Complete!")
-            st.markdown(response.text, unsafe_allow_html=True)
+            
+            # Cleaning up any markdown code block artifacts just in case AI forces it
+            clean_html = response.text.replace("```html", "").replace("```", "")
+            st.markdown(clean_html, unsafe_allow_html=True)
             
         except Exception as e:
             status_vid.empty()
-            st.error(f"⚠️ Video upload me error aaya (File too large ya API Limit). Try again. {e}")
-
-st.markdown("---")
+            st.error(f"⚠️ Video upload me error aaya. Try again. {e}")
