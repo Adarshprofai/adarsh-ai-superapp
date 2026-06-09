@@ -8,9 +8,10 @@ from google.genai import types
 # 1. पेज का प्रीमियम डिज़ाइन
 st.set_page_config(page_title="AI Channel Analyzer", page_icon="📈", layout="centered")
 
-# 2. Session State Initialization (Memory of the App)
+# 2. Session State Initialization
 if "analysis_done" not in st.session_state: st.session_state.analysis_done = False
 if "yt_data" not in st.session_state: st.session_state.yt_data = None
+if "ig_data" not in st.session_state: st.session_state.ig_data = None
 if "ai_response" not in st.session_state: st.session_state.ai_response = ""
 if "chat_history" not in st.session_state: st.session_state.chat_history = []
 if "current_key_index" not in st.session_state: st.session_state.current_key_index = 0
@@ -19,8 +20,10 @@ if "current_key_index" not in st.session_state: st.session_state.current_key_ind
 try:
     api_keys = st.secrets["GEMINI_API_KEYS"].split(",")
     yt_api_key = st.secrets["YOUTUBE_API_KEY"]
+    # get() use kiya hai taaki agar key na ho toh app crash na kare
+    rapid_api_key = st.secrets.get("RAPIDAPI_KEY", "") 
 except Exception as e:
-    st.error("⚠️ Secrets missing! Streamlit me GEMINI_API_KEYS aur YOUTUBE_API_KEY dalo.")
+    st.error("⚠️ Secrets missing! GEMINI_API_KEYS aur YOUTUBE_API_KEY dalo.")
     st.stop()
 
 # 4. 🌌 PURE DARK CINEMATIC CSS
@@ -38,7 +41,6 @@ dark_theme_css = """
 .blueprint-card { background: rgba(10, 25, 47, 0.7); backdrop-filter: blur(10px); border-left: 4px solid #00ffcc; border: 1px solid rgba(255,255,255,0.05); padding: 25px; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 .blueprint-card h3 { margin-top: 0; font-family: 'Arial', sans-serif; letter-spacing: 0.5px; }
 .blueprint-card p, .blueprint-card li { font-size: 1.05rem; line-height: 1.6; color: #ccd6f6; }
-/* Chat Interface Styling */
 .stChatInputContainer { border: 1px solid #00ffcc !important; border-radius: 10px !important; background-color: rgba(10, 25, 47, 0.8) !important; }
 textarea { color: #00ffcc !important; -webkit-text-fill-color: #00ffcc !important; }
 .stChatMessage { background-color: rgba(10, 25, 47, 0.5) !important; border: 1px solid rgba(0, 255, 204, 0.2); border-radius: 10px; color: white !important; }
@@ -47,7 +49,7 @@ textarea { color: #00ffcc !important; -webkit-text-fill-color: #00ffcc !importan
 st.markdown(dark_theme_css, unsafe_allow_html=True)
 
 # ==========================================
-# 🛠️ HELPER FUNCTION: Fetch YouTube Data
+# 🛠️ HELPER FUNCTIONS (YouTube & Instagram APIs)
 # ==========================================
 def get_youtube_data(channel_url, api_key):
     handle_match = re.search(r'@([a-zA-Z0-9_-]+)', channel_url)
@@ -56,7 +58,7 @@ def get_youtube_data(channel_url, api_key):
     
     url1 = f"https://www.googleapis.com/youtube/v3/channels?part=contentDetails,statistics&forHandle={handle}&key={api_key}"
     res1 = requests.get(url1).json()
-    if "items" not in res1 or len(res1["items"]) == 0: return None, "Channel nahi mila. Link check kar."
+    if "items" not in res1 or len(res1["items"]) == 0: return None, "Channel nahi mila."
         
     uploads_playlist_id = res1["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
     subs = res1["items"][0]["statistics"].get("subscriberCount", "Hidden")
@@ -73,10 +75,37 @@ def get_youtube_data(channel_url, api_key):
     for item in res3.get("items", []):
         title = item["snippet"]["title"]
         views = item["statistics"].get("viewCount", "0")
-        likes = item["statistics"].get("likeCount", "0")
-        video_data_list.append(f"Title: '{title}' | Views: {views} | Likes: {likes}")
+        video_data_list.append(f"Title: '{title}' | Views: {views}")
         
     return {"handle": handle, "subs": subs, "videos": video_data_list}, None
+
+def get_instagram_data(username, api_key):
+    # Agar RapidAPI key set nahi ki hai, toh error na aaye
+    if not api_key:
+        return {"username": username, "status": "No API Key, relying on AI assumptions"}, None
+        
+    username = username.replace("@", "").strip()
+    
+    # Ye ek standard RapidAPI endpoint ka example hai.
+    # (Note: RapidAPI endpoints can change, adjust host if you choose a different specific API)
+    url = "https://instagram-scraper-api2.p.rapidapi.com/v1/info"
+    querystring = {"username_or_id_or_url": username}
+    headers = {
+        "x-rapidapi-key": api_key,
+        "x-rapidapi-host": "instagram-scraper-api2.p.rapidapi.com"
+    }
+
+    try:
+        response = requests.get(url, headers=headers, params=querystring, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if "data" in data:
+                followers = data["data"].get("follower_count", "N/A")
+                posts = data["data"].get("media_count", "N/A")
+                return {"username": username, "followers": followers, "posts": posts}, None
+        return {"username": username, "status": "Private profile ya limit over, checking general aesthetic."}, None
+    except Exception as e:
+        return {"username": username, "status": f"API Blocked. Basic analysis only."}, None
 
 # ==========================================
 # FRONT PAGE UI
@@ -92,36 +121,44 @@ analyze_button = st.button("🚀 Analyze My Digital Identity", use_container_wid
 st.markdown("---")
 
 # ==========================================
-# BUTTON CLICK LOGIC (Processing Data)
+# BUTTON CLICK LOGIC
 # ==========================================
 if analyze_button:
     if not yt_link:
-        st.warning("⚠️ Bhai, YouTube link toh daal!")
+        st.warning("⚠️ Bhai, kam se kam YouTube link toh daal!")
     else:
         status_placeholder = st.empty()
-        status_placeholder.markdown("<div class='matrix-text'>⚡ Initializing connection to YouTube Data API...</div>", unsafe_allow_html=True)
+        status_placeholder.markdown("<div class='matrix-text'>⚡ Scraping Data cross-platform...</div>", unsafe_allow_html=True)
         
-        yt_data, error = get_youtube_data(yt_link, yt_api_key)
+        # Fetching YT
+        yt_data, yt_error = get_youtube_data(yt_link, yt_api_key)
         
-        if error:
+        # Fetching IG (If provided)
+        ig_data = None
+        if ig_username:
+            ig_data, _ = get_instagram_data(ig_username, rapid_api_key)
+        
+        if yt_error:
             status_placeholder.empty()
-            st.error(error)
+            st.error(yt_error)
         else:
-            status_placeholder.markdown("<div class='matrix-text'>⚡ Scraping video metrics & extracting patterns...</div>", unsafe_allow_html=True)
+            status_placeholder.markdown("<div class='matrix-text'>⚡ Fusing YouTube metrics with Instagram aesthetic logic...</div>", unsafe_allow_html=True)
             videos_text = "\n".join(yt_data['videos'])
             
             system_instruction = (
                 "You are a ruthless but brilliant AI YouTube & Instagram Strategist. "
-                "Analyze the provided YouTube data to find what works best. "
+                "Analyze the provided data to find what works best. "
                 "Output your analysis EXACTLY in 4 HTML cards:\n\n"
-                "<div class='blueprint-card'><h3 style='color: #ff4d4d;'>🚨 1. The Brutal Truth (Diagnosis)</h3><p>[Analysis based on views/titles]</p></div>\n"
+                "<div class='blueprint-card'><h3 style='color: #ff4d4d;'>🚨 1. The Brutal Truth (Diagnosis)</h3><p>[Analysis based on YT & IG vibe]</p></div>\n"
                 "<div class='blueprint-card'><h3 style='color: #ffd700;'>🎯 2. The Golden Niche</h3><p>[Niche recommendation]</p></div>\n"
                 "<div class='blueprint-card'><h3 style='color: #00ffcc;'>⏱️ 3. Timing & Frequency Strategy</h3><p>[Posting schedule for YT and IG]</p></div>\n"
-                "<div class='blueprint-card'><h3 style='color: #ff00ff;'>🚀 4. Your Next 3 Videos (Action Plan)</h3><p>[3 high-converting video titles/hooks]</p></div>\n\n"
-                "Just output raw HTML."
+                "<div class='blueprint-card'><h3 style='color: #ff00ff;'>🚀 4. Your Next 3 Videos (Action Plan)</h3><p>[3 high-converting hooks for YT/Reels]</p></div>\n\n"
+                "Just output raw HTML. No markdown blocks."
             )
             
-            user_prompt = f"Data for @{yt_data['handle']} ({yt_data['subs']} subs).\n\nLatest Videos:\n{videos_text}\n\nInsta: {ig_username}. Give me the 4-part Blueprint."
+            user_prompt = f"Data for YT @{yt_data['handle']} ({yt_data['subs']} subs).\nLatest Videos:\n{videos_text}\n"
+            if ig_data:
+                user_prompt += f"\nInsta Account Info: {ig_data}. Connect their YT topics with Insta Reel logic."
             
             chat_success = False
             response_text = ""
@@ -144,25 +181,22 @@ if analyze_button:
             status_placeholder.empty()
             
             if chat_success:
-                # 🟢 SAVING TO MEMORY 
                 st.session_state.yt_data = yt_data
+                st.session_state.ig_data = ig_data
                 st.session_state.ai_response = response_text
                 st.session_state.analysis_done = True
-                st.session_state.chat_history = [] # Naya link daalne par purani chat delete ho jayegi
+                st.session_state.chat_history = []
             else:
                 st.error("⚠️ API Down! Bhai thodi der me try kar.")
 
 # ==========================================
-# DISPLAY ZONE & CHAT INTERFACE (Independent of Button Click)
+# DISPLAY ZONE & CHAT INTERFACE
 # ==========================================
 if st.session_state.analysis_done:
-    # 1. Print The Saved Output
-    st.success(f"✅ Deep Analysis Complete for @{st.session_state.yt_data['handle']}!")
+    st.success(f"✅ Analysis Complete for @{st.session_state.yt_data['handle']}!")
     st.markdown(st.session_state.ai_response, unsafe_allow_html=True)
-    
     st.markdown("---")
     
-    # 2. THE CHATBOT SECTION
     st.markdown("<h2 class='glow-title' style='font-size: 2rem; color: #ff00ff;'>💬 Cross-Examine The AI</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center; color:#8892b0;'>Pucho kuch bhi. Niche wala hook pasand nahi aaya? Naya maang lo.</p>", unsafe_allow_html=True)
     
@@ -173,20 +207,18 @@ if st.session_state.analysis_done:
     user_chat = st.chat_input("Apne doubts yaha type kar bhai...")
 
     if user_chat:
-        # User message print karo
         with st.chat_message("user", avatar="🧑‍💻"): st.markdown(user_chat)
         st.session_state.chat_history.append({"role": "user", "content": user_chat})
         
-        # AI ko uska purana context yaad dilao
         chat_instruction = (
             "तुम्हारा नाम 'Adarsh Maurya AI' है। एकदम WhatsApp वाले short forms (thk, kya, bhi, yrr) use karo. Emoji bilkul mat lagao. "
             "Sarcasm aur jokes ka use karo. "
             f"TUNE ABHI IS CHANNEL KO ANALYZE KIYA HAI: {st.session_state.yt_data}. "
+            f"INSTA DATA: {st.session_state.ig_data}. "
             f"TERA DIYA GAYA ROADMAP YE HAI: {st.session_state.ai_response}. "
             "User ab tujhse is roadmap par sawaal puch raha hai. Use brutally honest aur clear reply de. Maximum 2-3 lines."
         )
         
-        # History ko API ke format me badlo
         gemini_history = []
         for m in st.session_state.chat_history:
             r = "user" if m["role"] == "user" else "model"
