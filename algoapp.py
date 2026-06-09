@@ -19,11 +19,11 @@ if "current_key_index" not in st.session_state: st.session_state.current_key_ind
 # 3. API Keys Loading
 try:
     api_keys = st.secrets["GEMINI_API_KEYS"].split(",")
-    yt_api_key = st.secrets["YOUTUBE_API_KEY"]
-    # get() use kiya hai taaki agar key na ho toh app crash na kare
+    # Use .get() so it doesn't crash if these are missing temporarily while testing
+    yt_api_key = st.secrets.get("YOUTUBE_API_KEY", "")
     rapid_api_key = st.secrets.get("RAPIDAPI_KEY", "") 
 except Exception as e:
-    st.error("⚠️ Secrets missing! GEMINI_API_KEYS aur YOUTUBE_API_KEY dalo.")
+    st.error("⚠️ Secrets missing! API Keys check karo.")
     st.stop()
 
 # 4. 🌌 PURE DARK CINEMATIC CSS
@@ -49,52 +49,51 @@ textarea { color: #00ffcc !important; -webkit-text-fill-color: #00ffcc !importan
 st.markdown(dark_theme_css, unsafe_allow_html=True)
 
 # ==========================================
-# 🛠️ HELPER FUNCTIONS (YouTube & Instagram APIs)
+# 🛠️ HELPER FUNCTIONS
 # ==========================================
 def get_youtube_data(channel_url, api_key):
+    if not api_key: return None, "YouTube API Key missing hai secrets me."
     handle_match = re.search(r'@([a-zA-Z0-9_-]+)', channel_url)
-    if not handle_match: return None, "Bhai URL me '@' wala handle nahi mila. Sahi link daal."
+    if not handle_match: return None, "Bhai URL me '@' wala handle nahi mila."
     handle = handle_match.group(1)
     
-    url1 = f"https://www.googleapis.com/youtube/v3/channels?part=contentDetails,statistics&forHandle={handle}&key={api_key}"
-    res1 = requests.get(url1).json()
-    if "items" not in res1 or len(res1["items"]) == 0: return None, "Channel nahi mila."
+    try:
+        url1 = f"https://www.googleapis.com/youtube/v3/channels?part=contentDetails,statistics&forHandle={handle}&key={api_key}"
+        res1 = requests.get(url1).json()
+        if "items" not in res1 or len(res1["items"]) == 0: return None, "Channel nahi mila."
+            
+        uploads_playlist_id = res1["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+        subs = res1["items"][0]["statistics"].get("subscriberCount", "Hidden")
         
-    uploads_playlist_id = res1["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
-    subs = res1["items"][0]["statistics"].get("subscriberCount", "Hidden")
-    
-    url2 = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=15&playlistId={uploads_playlist_id}&key={api_key}"
-    res2 = requests.get(url2).json()
-    video_ids = [item["snippet"]["resourceId"]["videoId"] for item in res2.get("items", [])]
-    if not video_ids: return None, "Is channel par koi video nahi hai."
+        url2 = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=15&playlistId={uploads_playlist_id}&key={api_key}"
+        res2 = requests.get(url2).json()
+        video_ids = [item["snippet"]["resourceId"]["videoId"] for item in res2.get("items", [])]
+        if not video_ids: return None, "Is channel par koi video nahi hai."
+            
+        url3 = f"https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id={','.join(video_ids)}&key={api_key}"
+        res3 = requests.get(url3).json()
         
-    url3 = f"https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id={','.join(video_ids)}&key={api_key}"
-    res3 = requests.get(url3).json()
-    
-    video_data_list = []
-    for item in res3.get("items", []):
-        title = item["snippet"]["title"]
-        views = item["statistics"].get("viewCount", "0")
-        video_data_list.append(f"Title: '{title}' | Views: {views}")
-        
-    return {"handle": handle, "subs": subs, "videos": video_data_list}, None
+        video_data_list = []
+        for item in res3.get("items", []):
+            title = item["snippet"]["title"]
+            views = item["statistics"].get("viewCount", "0")
+            video_data_list.append(f"Title: '{title}' | Views: {views}")
+            
+        return {"handle": handle, "subs": subs, "videos": video_data_list}, None
+    except Exception as e:
+        return None, "YouTube data fetch karne me error aaya."
 
 def get_instagram_data(username, api_key):
-    # Agar RapidAPI key set nahi ki hai, toh error na aaye
+    username = username.replace("@", "").strip()
     if not api_key:
         return {"username": username, "status": "No API Key, relying on AI assumptions"}, None
         
-    username = username.replace("@", "").strip()
-    
-    # Ye ek standard RapidAPI endpoint ka example hai.
-    # (Note: RapidAPI endpoints can change, adjust host if you choose a different specific API)
     url = "https://instagram-scraper-api2.p.rapidapi.com/v1/info"
     querystring = {"username_or_id_or_url": username}
     headers = {
         "x-rapidapi-key": api_key,
         "x-rapidapi-host": "instagram-scraper-api2.p.rapidapi.com"
     }
-
     try:
         response = requests.get(url, headers=headers, params=querystring, timeout=10)
         if response.status_code == 200:
@@ -103,9 +102,9 @@ def get_instagram_data(username, api_key):
                 followers = data["data"].get("follower_count", "N/A")
                 posts = data["data"].get("media_count", "N/A")
                 return {"username": username, "followers": followers, "posts": posts}, None
-        return {"username": username, "status": "Private profile ya limit over, checking general aesthetic."}, None
+        return {"username": username, "status": "Private profile ya API block. Basic AI check."}, None
     except Exception as e:
-        return {"username": username, "status": f"API Blocked. Basic analysis only."}, None
+        return {"username": username, "status": "API Timeout. Basic analysis only."}, None
 
 # ==========================================
 # FRONT PAGE UI
@@ -114,51 +113,65 @@ st.markdown("<h1 class='glow-title'>AI CHANNEL ANALYZER</h1>", unsafe_allow_html
 st.markdown("<p class='sub-title'>Stop guessing. Let AI decode your algorithm.</p>", unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
-with col1: yt_link = st.text_input("🔗 YouTube Channel URL", placeholder="https://youtube.com/@yourchannel")
+with col1: yt_link = st.text_input("🔗 YouTube Channel URL", placeholder="https://youtube.com/@yourchannel (Optional)")
 with col2: ig_username = st.text_input("📸 Instagram Username", placeholder="@yourusername (Optional)")
     
 analyze_button = st.button("🚀 Analyze My Digital Identity", use_container_width=True)
 st.markdown("---")
 
 # ==========================================
-# BUTTON CLICK LOGIC
+# BUTTON CLICK LOGIC (DYNAMIC DUAL-CHECK)
 # ==========================================
 if analyze_button:
-    if not yt_link:
-        st.warning("⚠️ Bhai, kam se kam YouTube link toh daal!")
+    # 🟢 DYNAMIC CHECK: Koi ek chiz zaroori hai
+    if not yt_link and not ig_username:
+        st.warning("⚠️ Bhai, kam se kam YouTube link ya Insta username me se ek chiz toh daal!")
     else:
         status_placeholder = st.empty()
-        status_placeholder.markdown("<div class='matrix-text'>⚡ Scraping Data cross-platform...</div>", unsafe_allow_html=True)
+        status_placeholder.markdown("<div class='matrix-text'>⚡ Initializing Data Scraping...</div>", unsafe_allow_html=True)
         
-        # Fetching YT
-        yt_data, yt_error = get_youtube_data(yt_link, yt_api_key)
-        
-        # Fetching IG (If provided)
+        yt_data, yt_error = None, None
         ig_data = None
+        
+        # 1. Fetch YT (If given)
+        if yt_link:
+            yt_data, yt_error = get_youtube_data(yt_link, yt_api_key)
+            
+        # 2. Fetch IG (If given)
         if ig_username:
             ig_data, _ = get_instagram_data(ig_username, rapid_api_key)
         
-        if yt_error:
+        # 3. Error Handle: Agar YT dala par error aaya, aur Insta nahi dala
+        if yt_link and yt_error and not ig_username:
             status_placeholder.empty()
             st.error(yt_error)
         else:
-            status_placeholder.markdown("<div class='matrix-text'>⚡ Fusing YouTube metrics with Instagram aesthetic logic...</div>", unsafe_allow_html=True)
-            videos_text = "\n".join(yt_data['videos'])
+            status_placeholder.markdown("<div class='matrix-text'>⚡ Fusing available data for AI analysis...</div>", unsafe_allow_html=True)
+            
+            # 4. Building Dynamic AI Prompt
+            user_prompt = "Target Digital Identity:\n"
+            platform_context = ""
+            
+            if yt_data:
+                videos_text = "\n".join(yt_data['videos'])
+                user_prompt += f"YouTube: @{yt_data['handle']} ({yt_data['subs']} subs).\nLatest Videos:\n{videos_text}\n"
+                platform_context += "YouTube "
+                
+            if ig_data:
+                user_prompt += f"Instagram Info: {ig_data}.\n"
+                platform_context += "and Instagram "
             
             system_instruction = (
-                "You are a ruthless but brilliant AI YouTube & Instagram Strategist. "
-                "Analyze the provided data to find what works best. "
+                "You are a ruthless but brilliant AI Social Media Strategist. "
+                f"Analyze the provided data for {platform_context.strip()} to find what works best. "
+                "If only one platform is provided, focus solely on that platform's strategy. If both, find cross-platform synergy. "
                 "Output your analysis EXACTLY in 4 HTML cards:\n\n"
-                "<div class='blueprint-card'><h3 style='color: #ff4d4d;'>🚨 1. The Brutal Truth (Diagnosis)</h3><p>[Analysis based on YT & IG vibe]</p></div>\n"
+                "<div class='blueprint-card'><h3 style='color: #ff4d4d;'>🚨 1. The Brutal Truth (Diagnosis)</h3><p>[Analysis based on the provided platforms]</p></div>\n"
                 "<div class='blueprint-card'><h3 style='color: #ffd700;'>🎯 2. The Golden Niche</h3><p>[Niche recommendation]</p></div>\n"
-                "<div class='blueprint-card'><h3 style='color: #00ffcc;'>⏱️ 3. Timing & Frequency Strategy</h3><p>[Posting schedule for YT and IG]</p></div>\n"
-                "<div class='blueprint-card'><h3 style='color: #ff00ff;'>🚀 4. Your Next 3 Videos (Action Plan)</h3><p>[3 high-converting hooks for YT/Reels]</p></div>\n\n"
+                "<div class='blueprint-card'><h3 style='color: #00ffcc;'>⏱️ 3. Timing & Frequency Strategy</h3><p>[Posting schedule for the given platforms]</p></div>\n"
+                "<div class='blueprint-card'><h3 style='color: #ff00ff;'>🚀 4. Your Next 3 Videos/Reels (Action Plan)</h3><p>[3 high-converting hooks for YT and/or IG]</p></div>\n\n"
                 "Just output raw HTML. No markdown blocks."
             )
-            
-            user_prompt = f"Data for YT @{yt_data['handle']} ({yt_data['subs']} subs).\nLatest Videos:\n{videos_text}\n"
-            if ig_data:
-                user_prompt += f"\nInsta Account Info: {ig_data}. Connect their YT topics with Insta Reel logic."
             
             chat_success = False
             response_text = ""
@@ -193,7 +206,12 @@ if analyze_button:
 # DISPLAY ZONE & CHAT INTERFACE
 # ==========================================
 if st.session_state.analysis_done:
-    st.success(f"✅ Analysis Complete for @{st.session_state.yt_data['handle']}!")
+    # Dinamic Success Message
+    display_names = []
+    if st.session_state.yt_data: display_names.append(f"YT: @{st.session_state.yt_data['handle']}")
+    if st.session_state.ig_data: display_names.append(f"IG: @{st.session_state.ig_data['username']}")
+    
+    st.success(f"✅ Analysis Complete for {' & '.join(display_names)}!")
     st.markdown(st.session_state.ai_response, unsafe_allow_html=True)
     st.markdown("---")
     
@@ -213,8 +231,7 @@ if st.session_state.analysis_done:
         chat_instruction = (
             "तुम्हारा नाम 'Adarsh Maurya AI' है। एकदम WhatsApp वाले short forms (thk, kya, bhi, yrr) use karo. Emoji bilkul mat lagao. "
             "Sarcasm aur jokes ka use karo. "
-            f"TUNE ABHI IS CHANNEL KO ANALYZE KIYA HAI: {st.session_state.yt_data}. "
-            f"INSTA DATA: {st.session_state.ig_data}. "
+            f"TUNE ABHI IS ACCOUNT KO ANALYZE KIYA HAI: YT: {st.session_state.yt_data}, IG: {st.session_state.ig_data}. "
             f"TERA DIYA GAYA ROADMAP YE HAI: {st.session_state.ai_response}. "
             "User ab tujhse is roadmap par sawaal puch raha hai. Use brutally honest aur clear reply de. Maximum 2-3 lines."
         )
