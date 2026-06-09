@@ -213,4 +213,170 @@ with tab1:
             st.warning("⚠️ Bhai, kam se kam YouTube link ya Instagram username me se ek cheez dalo!")
         else:
             status_placeholder = st.empty()
-            status_placeholder.markdown("
+            status_placeholder.markdown("<div class='matrix-text'>⚡ Fetching live server data cross-platform...</div>", unsafe_allow_html=True)
+            
+            yt_data, ig_data = None, None
+            if yt_link: yt_data, _ = get_youtube_data(yt_link, yt_api_key)
+            if ig_username: ig_data, _ = get_instagram_data(ig_username, rapid_api_key)
+            
+            status_placeholder.markdown("<div class='matrix-text'>⚡ Fusing system variables for Gemini Matrix...</div>", unsafe_allow_html=True)
+            
+            user_prompt = "Target Identity Specs:\n"
+            plat_context = ""
+            if yt_data: 
+                user_prompt += f"YouTube Account: @{yt_data['handle']} ({yt_data['subs']} subs).\nMetrics:\n{chr(10).join(yt_data['videos'])}\n"
+                plat_context += "YouTube "
+            if ig_data: 
+                user_prompt += f"Instagram Metadata: {ig_data}.\n"
+                plat_context += "and Instagram "
+            
+            system_instruction = (
+                "You are a ruthless but genius AI Social Media Architect. "
+                f"Analyze the incoming data stream for {plat_context.strip()}. "
+                "Output your response EXACTLY in 4 HTML cards using class='blueprint-card' with custom header inline styles. "
+                "Structure: 1. Diagnosis (Brutal Truth), 2. The Golden Niche, 3. Timing/Frequency, 4. Next 3 Content Hooks. "
+                "Strict Rule: Do not output markdown backticks like ```html. Just raw clean text strings."
+            )
+            
+            chat_success = False
+            for _ in range(len(api_keys)):
+                try:
+                    clean_key = api_keys[st.session_state.current_key_index].strip()
+                    client = genai.Client(api_key=clean_key)
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash', 
+                        contents=user_prompt, 
+                        config=types.GenerateContentConfig(system_instruction=system_instruction, temperature=0.7)
+                    )
+                    st.session_state.ai_response = response.text
+                    chat_success = True
+                    break
+                except Exception:
+                    st.session_state.current_key_index = (st.session_state.current_key_index + 1) % len(api_keys)
+            
+            status_placeholder.empty()
+            if chat_success:
+                st.session_state.yt_data = yt_data
+                st.session_state.ig_data = ig_data
+                st.session_state.analysis_done = True
+                st.success("✅ Platform Analysis Synced Successfully!")
+                clean_response = st.session_state.ai_response.replace("```html", "").replace("```", "")
+                st.markdown(clean_response, unsafe_allow_html=True)
+            else:
+                st.error("⚠️ Cloud Core Gateway Busy. Double check your API Keys.")
+
+# ----------------- SECTION 2: VIRAL PREDICTOR -----------------
+with tab2:
+    st.markdown("<h2 class='section-title'>🔮 Pre-Upload Video Audit Engine</h2>", unsafe_allow_html=True)
+    uploaded_video = st.file_uploader("📂 Choose unreleased MP4/MOV file (< 200MB)", type=["mp4", "mov"])
+    predict_button = st.button("👁️ Initialize Predictive Audit", use_container_width=True)
+    
+    if predict_button and uploaded_video:
+        status_vid = st.empty()
+        status_vid.markdown("<div class='matrix-text'>⚡ Tunneling media package to AI Core...</div>", unsafe_allow_html=True)
+        
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp_file:
+                tmp_file.write(uploaded_video.read())
+                tmp_path = tmp_file.name
+            
+            clean_key = api_keys[st.session_state.current_key_index].strip()
+            client = genai.Client(api_key=clean_key)
+            
+            status_vid.markdown("<div class='matrix-text'>⚡ Scanning frame vectors and analyzing speech rhythm...</div>", unsafe_allow_html=True)
+            video_file = client.files.upload(file=tmp_path)
+            time.sleep(3) 
+            
+            context = "New Stream Media."
+            if st.session_state.yt_data:
+                context = f"This file maps to Creator Profile @{st.session_state.yt_data['handle']}. Profile parameters: {st.session_state.yt_data['videos']}."
+            
+            video_prompt = f"""
+            {context}
+            Perform a brutal frame-by-frame and audio critique of this video. Do not use markdown blocks like ```html.
+            Format response EXACTLY with this structure:
+            <div class='blueprint-card'><h3 style='color:#ffd700'>🔥 1. Viral Probability Score (0-100%)</h3><p>[Score Analysis]</p></div>
+            <div class='blueprint-card'><h3 style='color:#ff4d4d'>🪝 2. The Hook Audit</h3><p>[First 3 seconds timeline review]</p></div>
+            <div class='blueprint-card'><h3 style='color:#00ffcc'>📖 3. Pacing & Script Retention</h3><p>[Dropoff zone flags]</p></div>
+            <div class='blueprint-card'><h3 style='color:#ff00ff'>✂️ 4. Aesthetic & Soundscape</h3><p>[Cuts, grade, audio critique]</p></div>
+            <div class='final-verdict-card'>
+                <h3>💡 5. Final Verdict & Free Strategic Advice</h3>
+                <p><strong>Will it go viral?:</strong> [Brutally clear answer]</p>
+                <p><strong>Expected Views Range:</strong> [Data-backed prediction]</p>
+                <p><strong>Crucial Tweaks Before Uploading:</strong><ul><li>[Fix 1]</li><li>[Fix 2]</li><li>[Fix 3]</li></ul></p>
+            </div>
+            """
+            
+            status_vid.markdown("<div class='matrix-text'>⚡ Processing final probability metrics...</div>", unsafe_allow_html=True)
+            response = client.models.generate_content(model='gemini-2.5-flash', contents=[video_file, video_prompt])
+            
+            os.remove(tmp_path)
+            status_vid.empty()
+            st.success("✅ Visual & Audio Diagnostics Finished!")
+            st.session_state.video_analysis = response.text
+            clean_vid_resp = response.text.replace("```html", "").replace("```", "")
+            st.markdown(clean_vid_resp, unsafe_allow_html=True)
+            
+        except Exception as e:
+            status_vid.empty()
+            st.error(f"⚠️ Pipeline execution failure: {e}")
+
+# ----------------- SECTION 3: AI STRATEGIC CONSULTANT -----------------
+with tab3:
+    st.markdown("<h2 class='section-title'>💬 AI Strategic Consultant (Full Context)</h2>", unsafe_allow_html=True)
+    
+    # Check if memory is empty
+    if not st.session_state.yt_data and not st.session_state.video_analysis and not st.session_state.ig_data:
+        st.info("Bhai, pehle Section 1 (Analysis) chalao ya Section 2 (Video Audit) me file dalo, taaki AI tumhare channel ka data padh sake!")
+    else:
+        st.markdown("<p style='color:#8892b0; font-family: monospace;'>[SYSTEM LOCK: Context Loaded. AI has full access to your cross-platform metrics and video assets.]</p>", unsafe_allow_html=True)
+        
+        # Display existing chat log
+        for msg in st.session_state.chat_history:
+            avatar = "🧑‍💻" if msg["role"] == "user" else "🤖"
+            with st.chat_message(msg["role"], avatar=avatar): st.markdown(msg["content"])
+
+        user_chat = st.chat_input("Ask anything: 'Mera hook change kardo' / 'Script re-write karo'...")
+
+        if user_chat:
+            with st.chat_message("user", avatar="🧑‍💻"): st.markdown(user_chat)
+            st.session_state.chat_history.append({"role": "user", "content": user_chat})
+            
+            # The Magic Blueprint: Merging Section 1 and Section 2 memory data into Section 3 chat logic
+            chat_instruction = f"""
+            तुम्हारा नाम 'Adarsh Maurya AI' है। एकदम WhatsApp वाले short forms (thk, kya, bhi, yrr, smjh) use karo. Emoji bilkul mat lagao.
+            Sarcasm aur direct, raw facts ka use karo. 
+            
+            YOU HAVE FULL ACCESS TO THIS BACKEND DATA:
+            YouTube Stats: {st.session_state.yt_data}
+            Instagram Stats: {st.session_state.ig_data}
+            Last Video Analysis Breakdown: {st.session_state.video_analysis}
+            
+            User is cross-questioning you based on their data. Answer accurately and smartly. Maximum 2-3 lines.
+            """
+            
+            gemini_history = []
+            for m in st.session_state.chat_history:
+                r = "user" if m["role"] == "user" else "model"
+                gemini_history.append({"role": r, "parts": [{"text": m["content"]}]})
+                
+            chat_success = False
+            for _ in range(len(api_keys)):
+                try:
+                    clean_key = api_keys[st.session_state.current_key_index].strip()
+                    client = genai.Client(api_key=clean_key)
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash', 
+                        contents=gemini_history, 
+                        config=types.GenerateContentConfig(system_instruction=chat_instruction, temperature=0.7)
+                    )
+                    with st.chat_message("assistant", avatar="🤖"): st.markdown(response.text)
+                    st.session_state.chat_history.append({"role": "assistant", "content": response.text})
+                    chat_success = True
+                    break
+                except Exception:
+                    st.session_state.current_key_index = (st.session_state.current_key_index + 1) % len(api_keys)
+                    
+            if not chat_success: st.error("⚠️ AI Core memory connection timed out.")
+
+st.markdown("---")
