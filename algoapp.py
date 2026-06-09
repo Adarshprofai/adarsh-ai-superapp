@@ -8,10 +8,11 @@ import base64
 from google import genai
 from google.genai import types
 
-# 1. Page Config
+# ==========================================
+# 1. PAGE CONFIG & SESSION STATE
+# ==========================================
 st.set_page_config(page_title="AI Creator Studio", page_icon="📈", layout="centered")
 
-# 2. Session State Initialization
 if "current_key_index" not in st.session_state: st.session_state.current_key_index = 0
 if "chat_history" not in st.session_state: st.session_state.chat_history = []
 if "analysis_done" not in st.session_state: st.session_state.analysis_done = False
@@ -19,7 +20,9 @@ if "yt_data" not in st.session_state: st.session_state.yt_data = None
 if "ig_data" not in st.session_state: st.session_state.ig_data = None
 if "ai_response" not in st.session_state: st.session_state.ai_response = ""
 
-# 3. API Keys Loading
+# ==========================================
+# 2. SECRETS LOADING
+# ==========================================
 try:
     api_keys = st.secrets["GEMINI_API_KEYS"].split(",")
     yt_api_key = st.secrets.get("YOUTUBE_API_KEY", "")
@@ -28,7 +31,9 @@ except Exception as e:
     st.error("⚠️ Secrets missing! Streamlit settings me GEMINI_API_KEYS dalo.")
     st.stop()
 
-# 4. Pure Dark Cinematic & Neon CSS
+# ==========================================
+# 3. PURE DARK CINEMATIC & NEON CSS
+# ==========================================
 dark_theme_css = """
 <style>
 #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
@@ -45,10 +50,10 @@ dark_theme_css = """
 [data-testid="baseButton-secondary"] { background-color: #00ffcc !important; color: #050b14 !important; font-weight: 800 !important; font-size: 1.1rem !important; border-radius: 8px !important; border: none !important; padding: 10px 0px !important; margin-top: 20px !important; transition: all 0.3s ease; }
 [data-testid="baseButton-secondary"]:hover { background-color: #00e6b8 !important; transform: scale(1.02); box-shadow: 0 0 20px rgba(0, 255, 204, 0.5) !important; }
 
-/* Hacker Loading Text Matrix Style */
+/* Matrix Text */
 .matrix-text { font-family: 'Courier New', Courier, monospace; color: #00ffcc; font-size: 1.2rem; text-align: center; text-shadow: 0 0 8px #00ffcc; margin: 40px 0; }
 
-/* Glassmorphism Output Cards */
+/* Cards */
 .blueprint-card { background: rgba(10, 25, 47, 0.7); backdrop-filter: blur(10px); border-left: 4px solid #00ffcc; border-top: 1px solid rgba(255,255,255,0.05); border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); padding: 25px; border-radius: 10px; margin-bottom: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
 .blueprint-card h3 { margin-top: 0; font-family: 'Arial', sans-serif; letter-spacing: 0.5px; }
 .blueprint-card p, .blueprint-card li { font-size: 1.05rem; line-height: 1.6; color: #ccd6f6; }
@@ -68,7 +73,7 @@ textarea { color: #00ffcc !important; -webkit-text-fill-color: #00ffcc !importan
 st.markdown(dark_theme_css, unsafe_allow_html=True)
 
 # ==========================================
-# 5. Helper Functions
+# 4. HELPER FUNCTIONS
 # ==========================================
 def get_base64_image(image_path):
     try:
@@ -80,7 +85,7 @@ def get_base64_image(image_path):
 def get_youtube_data(channel_url, api_key):
     if not api_key: return None, "YouTube API Key missing."
     handle_match = re.search(r'@([a-zA-Z0-9_-]+)', channel_url)
-    if not handle_match: return None, "Bhai URL me '@' wala handle nahi mila. Sahi link daal."
+    if not handle_match: return None, "Bhai URL me '@' wala handle nahi mila."
     handle = handle_match.group(1)
     try:
         url1 = f"https://www.googleapis.com/youtube/v3/channels?part=contentDetails,statistics&forHandle={handle}&key={api_key}"
@@ -116,13 +121,10 @@ def get_instagram_data(username, api_key):
     except Exception: return {"username": username, "status": "API Timeout"}, None
 
 # ==========================================
-# 6. Main UI Block (Fixed HTML & Logo)
+# 5. HEADER & LOGO
 # ==========================================
-
-# Local file se image ko base64 me convert karna
 img_b64 = get_base64_image("logo.jpeg")
 
-# Agar logo.jpeg nahi milti hai, toh ek default hacker avatar lag jayega
 if img_b64:
     img_source = f"data:image/jpeg;base64,{img_b64}"
 else:
@@ -140,7 +142,9 @@ header_html = f"""
 """
 st.markdown(header_html, unsafe_allow_html=True)
 
-# Tabs (Sirf 2 tab)
+# ==========================================
+# 6. MAIN TABS
+# ==========================================
 tab1, tab2 = st.tabs(["📈 Channel Analyzer", "🎬 Viral Predictor"])
 
 # ----------------- TAB 1: CHANNEL ANALYZER -----------------
@@ -152,7 +156,8 @@ with tab1:
     analyze_button = st.button("🚀 Analyze Channel Identity", use_container_width=True)
     
     if analyze_button:
-        if not yt_link and not ig_username: st.warning("⚠️ Koi ek link toh daal!")
+        if not yt_link and not ig_username: 
+            st.warning("⚠️ Koi ek link toh daal!")
         else:
             status_placeholder = st.empty()
             status_placeholder.markdown("<div class='matrix-text'>⚡ Fetching data...</div>", unsafe_allow_html=True)
@@ -165,13 +170,23 @@ with tab1:
             if yt_data: user_prompt += f"YouTube: @{yt_data['handle']}.\nLatest Videos:\n{chr(10).join(yt_data['videos'])}\n"
             if ig_data: user_prompt += f"Instagram Info: {ig_data}.\n"
             
-            system_instruction = "Output EXACTLY in 4 HTML cards: <div class='blueprint-card'><h3>...</h3><p>...</p></div> for Brutal Truth, Niche, Timing, Next 3 Videos. No markdown wrapping."
+            system_instruction = """
+            Output EXACTLY in 4 HTML cards:
+            <div class='blueprint-card'><h3>...</h3><p>...</p></div>
+            Create cards for: 1. Brutal Truth, 2. Golden Niche, 3. Timing Strategy, 4. Next 3 Videos.
+            No markdown wrappers like ```html around the output.
+            """
             
             chat_success = False
             for _ in range(len(api_keys)):
                 try:
-                    client = genai.Client(api_key=api_keys[st.session_state.current_key_index].strip())
-                    response = client.models.generate_content(model='gemini-2.5-flash', contents=user_prompt, config=types.GenerateContentConfig(system_instruction=system_instruction))
+                    clean_key = api_keys[st.session_state.current_key_index].strip()
+                    client = genai.Client(api_key=clean_key)
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash', 
+                        contents=user_prompt, 
+                        config=types.GenerateContentConfig(system_instruction=system_instruction)
+                    )
                     st.session_state.ai_response = response.text
                     chat_success = True
                     break
@@ -202,4 +217,96 @@ with tab2:
                 tmp_file.write(uploaded_video.read())
                 tmp_path = tmp_file.name
             
-            client = genai.Client(api_key=
+            clean_key = api_keys[st.session_state.current_key_index].strip()
+            client = genai.Client(api_key=clean_key)
+            
+            status_vid.markdown("<div class='matrix-text'>⚡ AI is watching every frame...</div>", unsafe_allow_html=True)
+            video_file = client.files.upload(file=tmp_path)
+            time.sleep(3) 
+            
+            context = "New User Video."
+            if st.session_state.yt_data:
+                context = f"Video belongs to YouTube @{st.session_state.yt_data['handle']}. Their past video patterns: {st.session_state.yt_data['videos']}."
+            
+            video_prompt = f"""
+            {context}
+            Watch this unreleased video and give a brutal review. Do NOT output markdown wrappers like ```html. 
+            Give output EXACTLY using this HTML structure:
+            <div class='blueprint-card'><h3 style='color:#ffd700'>🔥 1. Viral Probability Score (0-100%)</h3><p>[Verdict]</p></div>
+            <div class='blueprint-card'><h3 style='color:#ff4d4d'>🪝 2. The Hook Check</h3><p>[Rate first 3 secs]</p></div>
+            <div class='blueprint-card'><h3 style='color:#00ffcc'>📖 3. Storyline & Retention</h3><p>[Will they watch till the end?]</p></div>
+            <div class='blueprint-card'><h3 style='color:#ff00ff'>✂️ 4. Editing & Aesthetic</h3><p>[Critique cuts/audio]</p></div>
+            <div class='final-verdict-card'>
+                <h3>💡 5. Final Verdict & Steps</h3>
+                <p><strong>Viral?:</strong> [Yes/No/Needs Work]</p>
+                <p><strong>Expected Views:</strong> [Estimate]</p>
+                <p><strong>Fixes:</strong><ul><li>[Fix 1]</li><li>[Fix 2]</li></ul></p>
+            </div>
+            """
+            
+            status_vid.markdown("<div class='matrix-text'>⚡ Calculating Probability...</div>", unsafe_allow_html=True)
+            
+            response = client.models.generate_content(
+                model='gemini-2.5-flash', 
+                contents=[video_file, video_prompt]
+            )
+            
+            os.remove(tmp_path)
+            status_vid.empty()
+            st.success("✅ Analysis Complete!")
+            clean_vid_resp = response.text.replace("```html", "").replace("```", "")
+            st.markdown(clean_vid_resp, unsafe_allow_html=True)
+            
+        except Exception as e:
+            status_vid.empty()
+            st.error(f"⚠️ Video error. {e}")
+
+st.markdown("---")
+
+# ==========================================
+# 7. CROSS-EXAMINE CHAT
+# ==========================================
+if st.session_state.analysis_done:
+    st.markdown("<h2 class='glow-title' style='font-size: 2rem; color: #ff00ff; margin-top: 50px;'>💬 Cross-Examine The AI</h2>", unsafe_allow_html=True)
+    
+    for msg in st.session_state.chat_history:
+        avatar = "🧑‍💻" if msg["role"] == "user" else "🤖"
+        with st.chat_message(msg["role"], avatar=avatar): st.markdown(msg["content"])
+
+    user_chat = st.chat_input("Apne doubts yaha type kar bhai...")
+
+    if user_chat:
+        with st.chat_message("user", avatar="🧑‍💻"): st.markdown(user_chat)
+        st.session_state.chat_history.append({"role": "user", "content": user_chat})
+        
+        chat_instruction = f"""
+        तुम्हारा नाम 'Adarsh Maurya AI' है। एकदम WhatsApp वाले short forms use karo. Emoji mat lagao. 
+        Sarcasm aur jokes ka use karo. 
+        TUNE ABHI IS ACCOUNT KO ANALYZE KIYA HAI: YT: {st.session_state.yt_data}. 
+        TERA ROADMAP: {st.session_state.ai_response}. 
+        User roadmap par sawaal puch raha hai. Brutally honest aur clear reply de. Max 2-3 lines.
+        """
+        
+        gemini_history = []
+        for m in st.session_state.chat_history:
+            r = "user" if m["role"] == "user" else "model"
+            gemini_history.append({"role": r, "parts": [m["content"]]})
+            
+        chat_success = False
+        for _ in range(len(api_keys)):
+            try:
+                clean_key = api_keys[st.session_state.current_key_index].strip()
+                client = genai.Client(api_key=clean_key)
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash', 
+                    contents=gemini_history, 
+                    config=types.GenerateContentConfig(system_instruction=chat_instruction, temperature=0.7)
+                )
+                with st.chat_message("assistant", avatar="🤖"): st.markdown(response.text)
+                st.session_state.chat_history.append({"role": "assistant", "content": response.text})
+                chat_success = True
+                break
+            except Exception as e:
+                st.session_state.current_key_index = (st.session_state.current_key_index + 1) % len(api_keys)
+                
+        if not chat_success: st.error("⚠️ AI Hang! Quota over.")
