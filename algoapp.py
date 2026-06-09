@@ -140,14 +140,16 @@ if analyze_button:
             
             user_prompt = f"Here is the data for YouTube Channel @{yt_data['handle']} with {yt_data['subs']} subs.\n\nLatest Videos:\n{videos_text}\n\nTheir Instagram is: {ig_username}. Give me the 4-part Blueprint."
             
-            # 3. Call Gemini
+# 3. Call Gemini
             chat_success = False
             ai_response = ""
             status_placeholder.markdown("<div class='matrix-text'>⚡ Drafting the 30-Day Masterplan...</div>", unsafe_allow_html=True)
             
             for _ in range(len(api_keys)):
                 try:
-                    client = genai.Client(api_key=api_keys[st.session_state.current_key_index])
+                    # .strip() lagaya hai taaki extra space automatically hat jaye
+                    clean_key = api_keys[st.session_state.current_key_index].strip() 
+                    client = genai.Client(api_key=clean_key)
                     response = client.models.generate_content(
                         model='gemini-2.5-flash', 
                         contents=user_prompt, 
@@ -156,7 +158,9 @@ if analyze_button:
                     ai_response = response.text
                     chat_success = True
                     break
-                except Exception:
+                except Exception as e:
+                    # YE LINE ASLI ERROR DIKHAYEGI
+                    st.error(f"⚠️ Asli Error yahan hai: {e}") 
                     st.session_state.current_key_index = (st.session_state.current_key_index + 1) % len(api_keys)
             
             status_placeholder.empty()
@@ -166,4 +170,4 @@ if analyze_button:
                 st.success(f"✅ Deep Analysis Complete for @{yt_data['handle']}!")
                 st.markdown(ai_response, unsafe_allow_html=True)
             else:
-                st.error("API quota khatam ho gaya ya error aa gaya. Thodi der baad try kar.")
+                st.error("Sab try kar liya, par API nahi chal rahi. Upar wala 'Asli Error' check kar.")
