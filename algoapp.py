@@ -31,8 +31,13 @@ dark_theme_css = """
 <style>
 #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
 [data-testid="stAppViewContainer"] { background-color: #050b14; background-image: radial-gradient(circle at 50% 0%, #0d1b2a 0%, #050b14 70%); color: #e0e6ed; }
-.glow-title { text-align: center; font-family: 'Courier New', monospace; font-size: 3rem; font-weight: bold; color: #00ffcc; text-shadow: 0 0 20px rgba(0, 255, 204, 0.4); margin-bottom: 5px; }
-.sub-title { text-align: center; color: #8892b0; font-size: 1.1rem; letter-spacing: 1px; margin-top: 0px; margin-bottom: 40px; }
+
+/* Title Styling */
+.glow-title { 
+    text-align: center; font-family: 'Courier New', monospace; font-size: 3rem; font-weight: bold; 
+    color: #00ffcc; text-shadow: 0 0 20px rgba(0, 255, 204, 0.4); margin: 0;
+}
+.sub-title { text-align: center; color: #8892b0; font-size: 1.1rem; letter-spacing: 1px; margin-top: -10px; margin-bottom: 40px; }
 .section-title { color: #ff00ff; font-family: 'Courier New', monospace; font-size: 2rem; margin-top: 40px; margin-bottom: 20px; text-shadow: 0 0 10px rgba(255, 0, 255, 0.4); }
 .stTextInput > div > div > input { background-color: rgba(10, 25, 47, 0.6) !important; border: 1px solid #1f4068 !important; color: #00ffcc !important; border-radius: 8px; padding: 12px; font-family: monospace; transition: all 0.3s ease; }
 [data-testid="baseButton-secondary"] { background-color: #00ffcc !important; color: #050b14 !important; font-weight: 800 !important; font-size: 1.1rem !important; border-radius: 8px !important; border: none !important; padding: 10px 0px !important; margin-top: 20px !important; transition: all 0.3s ease; }
@@ -43,14 +48,11 @@ dark_theme_css = """
 .blueprint-card p, .blueprint-card li { font-size: 1.05rem; line-height: 1.6; color: #ccd6f6; }
 [data-testid="stFileUploadDropzone"] { background-color: rgba(10, 25, 47, 0.6) !important; border: 2px dashed #00ffcc !important; }
 
-/* 🔥 NEW: THE FINAL VERDICT NEON BOX */
+/* 🔥 NEON VERDICT BOX */
 .final-verdict-card { 
     background: linear-gradient(145deg, rgba(0, 255, 170, 0.1) 0%, rgba(5, 11, 20, 0.9) 100%); 
     border: 2px solid #00ffaa; 
-    padding: 30px; 
-    border-radius: 12px; 
-    margin-top: 40px; 
-    margin-bottom: 25px;
+    padding: 30px; border-radius: 12px; margin-top: 40px; margin-bottom: 25px;
     box-shadow: 0 0 25px rgba(0, 255, 170, 0.3); 
 }
 .final-verdict-card h3 { margin-top: 0; color: #00ffaa; font-family: 'Arial', sans-serif; font-size: 1.5rem; text-transform: uppercase;}
@@ -105,7 +107,15 @@ def get_instagram_data(username, api_key):
 # ==========================================
 # FRONT PAGE UI
 # ==========================================
-st.markdown("<h1 class='glow-title'>AI CREATOR STUDIO</h1>", unsafe_allow_html=True)
+
+# 🔥🟢 LOGO INTEGRATION JIDHAR TUNE MARK LAGAYA THA
+main_title_with_logo_html = """
+<div style='display: flex; align-items: center; justify-content: center; margin-bottom: 5px; gap: 20px;'>
+    <h1 class='glow-title'>AI CREATOR STUDIO</h1>
+    <img src='[YOUR_IMAGE_URL_HERE]' style='border-radius: 50%; width: 60px; height: 60px; object-fit: cover; box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);'>
+</div>
+"""
+st.markdown(main_title_with_logo_html, unsafe_allow_html=True)
 st.markdown("<p class='sub-title'>Decode your algorithm. Predict your virality.</p>", unsafe_allow_html=True)
 
 tab1, tab2 = st.tabs(["📈 Channel Analyzer", "🎬 Viral Predictor (Pre-Upload Check)"])
@@ -179,7 +189,6 @@ with tab2:
             if st.session_state.yt_data:
                 context = f"This video belongs to YouTube Channel @{st.session_state.yt_data['handle']}. Their past video patterns: {st.session_state.yt_data['videos']}. Evaluate based on their specific audience."
             
-            # 🔥 THE NEW PROMPT WITH THE FINAL FREE ADVICE SECTION
             video_prompt = f"{context}\nWatch this unreleased video and give a brutal, honest review. " \
                            "You MUST NOT output markdown wrappers like ```html. Just raw HTML text. " \
                            "Give output EXACTLY using this HTML structure:\n" \
@@ -204,8 +213,6 @@ with tab2:
             
             status_vid.empty()
             st.success("✅ Video Analysis Complete!")
-            
-            # Cleaning up any markdown code block artifacts just in case AI forces it
             clean_html = response.text.replace("```html", "").replace("```", "")
             st.markdown(clean_html, unsafe_allow_html=True)
             
