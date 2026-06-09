@@ -9,47 +9,134 @@ from google import genai
 from google.genai import types
 
 # ==========================================
-# 1. PAGE CONFIG & MEMORY (Session State)
+# 1. PAGE CONFIG & MEMORY STORAGE
 # ==========================================
-st.set_page_config(page_title="AI Creator Studio", page_icon="📈", layout="centered")
+st.set_page_config(page_title="AI Creator Studio Pro", page_icon="📈", layout="centered")
 
-# AI की याददाश्त (Memory) के लिए Storage
+if "current_key_index" not in st.session_state: st.session_state.current_key_index = 0
+if "chat_history" not in st.session_state: st.session_state.chat_history = []
+if "analysis_done" not in st.session_state: st.session_state.analysis_done = False
 if "yt_data" not in st.session_state: st.session_state.yt_data = None
 if "ig_data" not in st.session_state: st.session_state.ig_data = None
 if "video_analysis" not in st.session_state: st.session_state.video_analysis = ""
-if "chat_history" not in st.session_state: st.session_state.chat_history = []
-if "current_key_index" not in st.session_state: st.session_state.current_key_index = 0
+if "ai_response" not in st.session_state: st.session_state.ai_response = ""
 
 # ==========================================
-# 2. API KEYS LOADING
+# 2. SECRETS LOADING
 # ==========================================
 try:
     api_keys = st.secrets["GEMINI_API_KEYS"].split(",")
     yt_api_key = st.secrets.get("YOUTUBE_API_KEY", "")
     rapid_api_key = st.secrets.get("RAPIDAPI_KEY", "") 
 except Exception as e:
-    st.error("⚠️ Secrets missing! API Keys check karo.")
+    st.error("⚠️ Secrets missing! Streamlit me GEMINI_API_KEYS set karo.")
     st.stop()
 
 # ==========================================
-# 3. PREMIUM DARK & NEON CSS
+# 3. HIGH-VISIBILITY GLOWING DARK YELLOW CSS
 # ==========================================
-st.markdown("""
+glowing_yellow_css = """
 <style>
 #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-[data-testid="stAppViewContainer"] { background-color: #050b14; background-image: radial-gradient(circle at 50% 0%, #0d1b2a 0%, #050b14 70%); color: #e0e6ed; }
-.section-title { color: #ff00ff; font-family: 'Courier New', monospace; font-size: 1.8rem; margin: 20px 0; text-shadow: 0 0 10px rgba(255, 0, 255, 0.4); }
-.stTextInput > div > div > input { background-color: rgba(10, 25, 47, 0.6) !important; border: 1px solid #1f4068 !important; color: #00ffcc !important; border-radius: 8px; padding: 12px; }
-[data-testid="baseButton-secondary"] { background-color: #00ffcc !important; color: #050b14 !important; font-weight: 800 !important; border-radius: 8px !important; }
-.matrix-text { font-family: 'Courier New', monospace; color: #00ffcc; font-size: 1.1rem; text-align: center; margin: 20px 0; }
-.blueprint-card { background: rgba(10, 25, 47, 0.7); border-left: 4px solid #00ffcc; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-.final-verdict-card { background: linear-gradient(145deg, rgba(0, 255, 170, 0.1) 0%, rgba(5, 11, 20, 0.9) 100%); border: 2px solid #00ffaa; padding: 25px; border-radius: 12px; }
-.stChatInputContainer { border: 1px solid #00ffcc !important; border-radius: 10px !important; }
+[data-testid="stAppViewContainer"] { 
+    background-color: #03070d; 
+    background-image: radial-gradient(circle at 50% 0%, #0a111e 0%, #03070d 80%); 
+    color: #e2e8f0; 
+}
+h1, h2, h3, p, span, div, li { color: #ffffff !important; }
+
+/* Section Titles */
+.section-title { 
+    color: #ffb700 !important; 
+    font-family: 'Courier New', monospace; 
+    font-size: 2rem; 
+    margin-top: 30px; 
+    text-shadow: 0 0 15px rgba(255, 183, 0, 0.4); 
+}
+
+/* High Visibility Input Boxes */
+.stTextInput > div > div > input { 
+    background-color: rgba(20, 35, 55, 0.8) !important; 
+    border: 2px solid #ffb700 !important; 
+    color: #ffffff !important; 
+    border-radius: 8px; 
+    padding: 12px; 
+    font-weight: bold;
+    font-family: monospace;
+}
+.stTextInput > div > div > input:focus {
+    box-shadow: 0 0 15px rgba(255, 183, 0, 0.5) !important;
+}
+
+/* Glowing Neon Cyan Button for Accents */
+[data-testid="baseButton-secondary"] { 
+    background-color: #00ffcc !important; 
+    color: #03070d !important; 
+    font-weight: 800 !important; 
+    font-size: 1.1rem !important;
+    border-radius: 8px !important; 
+    border: none !important;
+    padding: 10px 0px !important;
+    box-shadow: 0 0 15px rgba(0, 255, 204, 0.3) !important;
+}
+[data-testid="baseButton-secondary"]:hover {
+    background-color: #00e6b8 !important;
+    transform: scale(1.01);
+    box-shadow: 0 0 25px rgba(0, 255, 204, 0.6) !important;
+}
+
+/* Loading Text Matrix Style */
+.matrix-text { 
+    font-family: 'Courier New', monospace; 
+    color: #ffb700; 
+    font-size: 1.2rem; 
+    text-align: center; 
+    text-shadow: 0 0 8px #ffb700; 
+    margin: 30px 0; 
+}
+
+/* 🔥 CHAMKNE WALE DARK YELLOW CARDS */
+.blueprint-card { 
+    background: rgba(15, 25, 40, 0.85); 
+    backdrop-filter: blur(12px); 
+    border: 2px solid #ffb700; 
+    padding: 25px; 
+    border-radius: 12px; 
+    margin-bottom: 25px; 
+    box-shadow: 0 0 20px rgba(255, 183, 0, 0.2); 
+}
+.blueprint-card h3 { margin-top: 0; font-weight: bold; letter-spacing: 0.5px; }
+.blueprint-card p, .blueprint-card li { font-size: 1.05rem; line-height: 1.6; color: #e2e8f0 !important; }
+
+/* Ultimate Verdict Glowing Box */
+.final-verdict-card { 
+    background: linear-gradient(145deg, rgba(255, 183, 0, 0.15) 0%, rgba(3, 7, 13, 0.95) 100%); 
+    border: 2.5px solid #ffb700; 
+    padding: 30px; 
+    border-radius: 12px; 
+    margin-top: 35px; 
+    box-shadow: 0 0 30px rgba(255, 183, 0, 0.4); 
+}
+.final-verdict-card h3 { margin-top: 0; color: #ffb700 !important; font-size: 1.6rem; text-transform: uppercase; text-shadow: 0 0 10px rgba(255,183,0,0.3); }
+.final-verdict-card p, .final-verdict-card li { font-size: 1.15rem; line-height: 1.7; color: #ffffff !important; }
+.final-verdict-card strong { color: #ffcc00 !important; }
+
+/* Chat Container Fixes */
+.stChatInputContainer { border: 2px solid #ffb700 !important; border-radius: 10px !important; background-color: rgba(15, 25, 40, 0.9) !important; }
+textarea { color: #ffffff !important; -webkit-text-fill-color: #ffffff !important; }
+.stChatMessage { background-color: rgba(20, 35, 55, 0.6) !important; border: 1px solid rgba(255, 183, 0, 0.2); border-radius: 10px; }
+
+/* Tabs Design Customization */
+.stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+    font-size: 1.1rem !important;
+    font-weight: bold !important;
+}
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(glowing_yellow_css, unsafe_allow_html=True)
 
 # ==========================================
-# 4. HELPER FUNCTIONS
+# 4. DATA FETCHING BACKEND LOGIC
 # ==========================================
 def get_base64_image(image_path):
     try:
@@ -57,105 +144,73 @@ def get_base64_image(image_path):
     except: return ""
 
 def get_youtube_data(channel_url, api_key):
+    if not api_key: return None, "YouTube API Key missing."
     handle_match = re.search(r'@([a-zA-Z0-9_-]+)', channel_url)
-    if not handle_match: return None, "Handle missing."
+    if not handle_match: return None, "Bhai URL me '@' wala handle sahi se dalo."
     handle = handle_match.group(1)
     try:
         u1 = f"https://www.googleapis.com/youtube/v3/channels?part=contentDetails,statistics&forHandle={handle}&key={api_key}"
         r1 = requests.get(u1).json()
         up_id = r1["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
-        subs = r1["items"][0]["statistics"].get("subscriberCount", "N/A")
-        u2 = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=10&playlistId={up_id}&key={api_key}"
+        subs = r1["items"][0]["statistics"].get("subscriberCount", "Hidden")
+        u2 = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=12&playlistId={up_id}&key={api_key}"
         r2 = requests.get(u2).json()
         v_ids = [i["snippet"]["resourceId"]["videoId"] for i in r2.get("items", [])]
         u3 = f"https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id={','.join(v_ids)}&key={api_key}"
         r3 = requests.get(u3).json()
-        v_list = [f"Title: {i['snippet']['title']} | Views: {i['statistics'].get('viewCount','0')}" for i in r3.get("items", [])]
+        v_list = [f"Title: '{i['snippet']['title']}' | Views: {i['statistics'].get('viewCount','0')}" for i in r3.get("items", [])]
         return {"handle": handle, "subs": subs, "videos": v_list}, None
-    except: return None, "YT API Error."
+    except: return None, "YouTube server se data nahi nikal paya."
+
+def get_instagram_data(username, api_key):
+    username = username.replace("@", "").strip()
+    if not api_key: return {"username": username, "status": "No API Key, generic aesthetic analytics active"}, None
+    url = "https://instagram-scraper-api2.p.rapidapi.com/v1/info"
+    querystring = {"username_or_id_or_url": username}
+    headers = {"x-rapidapi-key": api_key, "x-rapidapi-host": "instagram-scraper-api2.p.rapidapi.com"}
+    try:
+        response = requests.get(url, headers=headers, params=querystring, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if "data" in data: return {"username": username, "followers": data["data"].get("follower_count", "N/A"), "posts": data["data"].get("media_count", "N/A")}, None
+        return {"username": username, "status": "Profile fetched"}, None
+    except: return {"username": username, "status": "Basic check"}, None
 
 # ==========================================
-# 5. HEADER & LOGO
+# 5. BRAND HEADER INTEGRATION
 # ==========================================
 img_b64 = get_base64_image("logo.jpeg")
 img_src = f"data:image/jpeg;base64,{img_b64}" if img_b64 else "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
 
-st.markdown(f"""
-<div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
-    <img src="{img_src}" style="border-radius: 50%; width: 80px; height: 80px; object-fit: cover; border: 3px solid #00ffcc;">
-    <div>
-        <h1 style="color: #00ffcc; margin: 0; font-size: 2.5rem;">AI CREATOR STUDIO</h1>
-        <p style="color: #8892b0; margin: 0;">By Adarsh Maurya • Data-Driven Virality</p>
+header_html = f"""
+<div style="display: flex; align-items: center; justify-content: center; gap: 22px; margin-top: 15px;">
+    <img src="{img_src}" style="border-radius: 50%; width: 95px; height: 95px; object-fit: cover; box-shadow: 0 0 25px rgba(255, 183, 0, 0.4); border: 3px solid #ffb700;">
+    <div style="display: flex; flex-direction: column;">
+        <h1 style="font-family: 'Courier New', monospace; font-size: 2.8rem; font-weight: bold; color: #ffb700; text-shadow: 0 0 20px rgba(255, 183, 0, 0.3); margin: 0; line-height: 1.1;">AI CREATOR STUDIO</h1>
+        <p style="color: #8892b0; font-size: 1.1rem; letter-spacing: 1px; margin: 0; padding-top: 6px;">Decode your algorithm. Predict your virality.</p>
     </div>
 </div>
-""", unsafe_allow_html=True)
+<br>
+"""
+st.markdown(header_html, unsafe_allow_html=True)
 
 # ==========================================
-# 6. MAIN TABS
+# 6. WORKSPACE TABS (THE CORE 3 SECTIONS)
 # ==========================================
-tab1, tab2, tab3 = st.tabs(["📈 Analysis", "🎬 Viral Predictor", "💬 AI Consultant"])
+tab1, tab2, tab3 = st.tabs(["📈 Channel Analyzer", "🎬 Viral Predictor", "💬 AI Consultant"])
 
-# --- TAB 1: ANALYZER ---
+# ----------------- SECTION 1: CHANNEL ANALYZER -----------------
 with tab1:
-    yt_in = st.text_input("YouTube URL", placeholder="@handle")
-    if st.button("🚀 Analyze Channel"):
-        with st.spinner("Decoding Channel..."):
-            data, err = get_youtube_data(yt_in, yt_api_key)
-            if err: st.error(err)
-            else:
-                st.session_state.yt_data = data
-                st.success(f"Channel @{data['handle']} Loaded!")
-                st.write(f"Subscribers: {data['subs']}")
-
-# --- TAB 2: PREDICTOR ---
-with tab2:
-    st.markdown("<h2 class='section-title'>🔮 Video Audit</h2>", unsafe_allow_html=True)
-    up_vid = st.file_uploader("Upload MP4", type=["mp4"])
-    if st.button("👁️ Predict Success") and up_vid:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-            tmp.write(up_vid.read())
-            path = tmp.name
-        client = genai.Client(api_key=api_keys[st.session_state.current_key_index].strip())
-        video_file = client.files.upload(file=path)
-        time.sleep(3)
-        prompt = "Analyze this video and give Viral Score, Hook Check, and Editing tips in HTML cards."
-        response = client.models.generate_content(model='gemini-2.5-flash', contents=[video_file, prompt])
-        st.session_state.video_analysis = response.text
-        st.markdown(response.text.replace("```html","").replace("```",""), unsafe_allow_html=True)
-        os.remove(path)
-
-# --- TAB 3: THE STRATEGIC CHAT (The 3rd Section) ---
-with tab3:
-    st.markdown("<h2 class='section-title'>💬 AI Strategic Consultant</h2>", unsafe_allow_html=True)
-    
-    if not st.session_state.yt_data and not st.session_state.video_analysis:
-        st.info("Bhai, pehle Channel Analyze kar ya Video upload kar, tabhi AI jawab de payega.")
-    else:
-        st.markdown("<p style='color:#8892b0;'>AI knows your data. Ask about your strategy, scripts, or fixes.</p>", unsafe_allow_html=True)
+    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+    with col1: yt_link = st.text_input("🔗 YouTube Channel URL", placeholder="https://youtube.com/@yourchannel")
+    with col2: ig_username = st.text_input("📸 Instagram Username", placeholder="@yourusername")
         
-        for msg in st.session_state.chat_history:
-            with st.chat_message(msg["role"]): st.markdown(msg["content"])
-
-        if prompt := st.chat_input("Ex: 'Is video ka hook mere channel ke hisab se kaisa hai?'"):
-            st.session_state.chat_history.append({"role": "user", "content": prompt})
-            with st.chat_message("user"): st.markdown(prompt)
-            
-            # AI CONTEXT BUILDING
-            context = f"""
-            You are 'Adarsh Maurya AI'. You have full access to the user's data.
-            CHANNEL DATA: {st.session_state.yt_data}
-            LAST VIDEO AUDIT: {st.session_state.video_analysis}
-            
-            Reply in Hinglish (WhatsApp style). Use sarcasm and deep logic. Max 3 lines.
-            """
-            
-            try:
-                client = genai.Client(api_key=api_keys[st.session_state.current_key_index].strip())
-                res = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=[{"role": "user", "parts": [{"text": f"{context}\n\nUser Question: {prompt}"}]}]
-                )
-                with st.chat_message("assistant"): st.markdown(res.text)
-                st.session_state.chat_history.append({"role": "assistant", "content": res.text})
-            except:
-                st.error("API Limit Over.")
+    analyze_button = st.button("🚀 Analyze Digital Footprint", use_container_width=True)
+    
+    if analyze_button:
+        if not yt_link and not ig_username: 
+            st.warning("⚠️ Bhai, kam se kam YouTube link ya Instagram username me se ek cheez dalo!")
+        else:
+            status_placeholder = st.empty()
+            status_placeholder.markdown("
